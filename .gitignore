@@ -1,0 +1,16 @@
+# --- Proprietary driver binaries: NOT redistributed here -------------------
+# These belong to MediaTek / the laptop OEM. The tool does not ship them; it
+# pulls the in-box Windows 10 'mtkwl6ex' package from your own DriverStore.
+driver/
+historical/
+
+# --- Run logs may contain personal data (MAC, SSID, BSSID, hostname) --------
+logs/
+*.log
+
+# --- Local work artifacts ---------------------------------------------------
+_guitest_run.ps1
+*.tmp
+*.bak
+Thumbs.db
+desktop.ini
