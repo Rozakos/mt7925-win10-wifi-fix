@@ -51,21 +51,23 @@ $grpStatus.Size     = New-Object System.Drawing.Size(716, 96)
 $grpStatus.Anchor   = 'Top,Left,Right'
 $form.Controls.Add($grpStatus)
 
-function New-StatusRow($label, $x, $y) {
+function New-StatusRow($label, $x, $y, $valueOffset) {
     $l = New-Object System.Windows.Forms.Label
     $l.Text = $label; $l.Location = New-Object System.Drawing.Point($x, $y)
     $l.AutoSize = $true; $l.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
     $grpStatus.Controls.Add($l)
     $v = New-Object System.Windows.Forms.Label
-    $v.Text = '...'; $v.Location = New-Object System.Drawing.Point(($x + 110), $y)
+    $v.Text = '...'; $v.Location = New-Object System.Drawing.Point(($x + $valueOffset), $y)
     $v.AutoSize = $true
     $grpStatus.Controls.Add($v)
     $v
 }
-$valDevice      = New-StatusRow 'Adapter:'      16  24
-$valSubsys      = New-StatusRow 'Subsystem:'    16  46
-$valSecureBoot  = New-StatusRow 'Secure Boot:'  390 24
-$valTestSign    = New-StatusRow 'Test signing:' 390 46
+# Row 1: adapter on its own full-width line (its name is long and auto-sizes).
+# Row 2: subsystem + the two firmware/signing states, spaced so nothing overlaps.
+$valDevice      = New-StatusRow 'Adapter:'      16  24  64
+$valSubsys      = New-StatusRow 'Subsystem:'    16  52  80
+$valSecureBoot  = New-StatusRow 'Secure Boot:'  250 52  88
+$valTestSign    = New-StatusRow 'Test signing:' 470 52  88
 
 # --- instruction banner ----------------------------------------------------
 $lblInstruct = New-Object System.Windows.Forms.Label
