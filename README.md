@@ -1,5 +1,12 @@
 # MediaTek MT7925 Wi-Fi Fix for Windows 10
 
+[![Latest release](https://img.shields.io/github/v/release/Rozakos/mt7925-win10-wifi-fix?label=download&sort=semver)](https://github.com/Rozakos/mt7925-win10-wifi-fix/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Rozakos/mt7925-win10-wifi-fix/total)](https://github.com/Rozakos/mt7925-win10-wifi-fix/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Platform: Windows 10](https://img.shields.io/badge/platform-Windows%2010-0078D6)
+
+**➡️ [Download the latest release](https://github.com/Rozakos/mt7925-win10-wifi-fix/releases/latest)** — extract the ZIP and double-click `Run-MT7925-GUI.bat`.
+
 Get the **MediaTek MT7925 Wi-Fi 7** adapter working on **Windows 10** when the laptop
 shipped with **Windows 11-only drivers**, so the adapter fails to install.
 
