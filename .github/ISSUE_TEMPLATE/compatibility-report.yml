@@ -1,0 +1,92 @@
+name: Compatibility report
+description: Report whether the fix worked (or didn't) on your laptop, so we can confirm it works across MT7925 OEM variants.
+title: "[Compat] <laptop make & model> - <worked / didn't work>"
+labels: ["compatibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping map out which laptops this works on! Please fill in your
+        **laptop model** and **hardware ID** — those two are what matter most.
+
+        ### How to get your hardware ID (copy/paste output here)
+        Open PowerShell and run:
+        ```powershell
+        Get-PnpDevice | Where-Object { $_.HardwareID -like "*14C3*7925*" } |
+          ForEach-Object { (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName DEVPKEY_Device_HardwareIds).Data } |
+          Where-Object { $_ -like "PCI*" } | Select-Object -First 1
+        ```
+        It looks like `PCI\VEN_14C3&DEV_7925&SUBSYS_XXXXXXXX&REV_00`.
+
+  - type: input
+    id: laptop-model
+    attributes:
+      label: Laptop make & model
+      description: Brand, model name, and model number if you have it.
+      placeholder: e.g. Lenovo IdeaPad Slim 3 15ARP10 (83K7)
+    validations:
+      required: true
+
+  - type: input
+    id: hardware-id
+    attributes:
+      label: Hardware ID
+      description: Paste the full PCI hardware ID from the command above.
+      placeholder: PCI\VEN_14C3&DEV_7925&SUBSYS_XXXXXXXX&REV_00
+    validations:
+      required: true
+
+  - type: dropdown
+    id: result
+    attributes:
+      label: Did the fix work?
+      options:
+        - "Yes - Wi-Fi works"
+        - "Partially - installed but still has problems"
+        - "No - did not work"
+    validations:
+      required: true
+
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      description: Run `winver` and copy the version/build (e.g. Windows 10 22H2, build 19045).
+      placeholder: e.g. Windows 10 Pro 22H2 (19045.4291)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: method
+    attributes:
+      label: Which tool did you use?
+      options:
+        - "GUI (Run-MT7925-GUI.bat)"
+        - "CLI (Fix-MT7925-WiFi.ps1)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: driver-source
+    attributes:
+      label: Was the mtkwl6ex driver already in your DriverStore?
+      description: i.e. did the tool find it on its own, or did you have to supply it?
+      options:
+        - "Yes - the tool found it automatically"
+        - "No - I installed it via Windows Update optional driver"
+        - "No - I supplied it with -DriverSource"
+        - "Not sure"
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / errors / log excerpt
+      description: |
+        Anything else worth knowing — the final device Status/Problem, any error
+        codes (Code 28/37/39), or a snippet of the log the tool wrote. Logs may
+        contain your MAC/SSID, so feel free to redact those.
+      render: shell
+    validations:
+      required: false
