@@ -52,6 +52,9 @@ any MT7925 laptop (Lenovo, HP, Dell, Asus, …), not just one model.
 
    End state: **Secure Boot ON, test signing OFF, Wi-Fi working.**
 
+   If you switch test signing on or off and haven't rebooted yet, the tool says so and
+   offers **Restart now** instead of letting you continue too early.
+
 The tool can't change Secure Boot itself (no Windows program can — it's a firmware
 setting, by design), so steps 1 and 5 are done in BIOS and the tool **verifies** them
 for you with the **Re-check** button.
@@ -103,6 +106,7 @@ Run-MT7925-GUI.bat     Self-elevating launcher for the GUI
 Fix-MT7925-WiFi.ps1    Command-line front-end
 Run-Fix.bat            Self-elevating launcher for the CLI
 engine/MT7925-Core.ps1 Shared engine (all logic; GUI and CLI both use it)
+tests/Run-Tests.ps1    Unit tests (powershell -File tests\Run-Tests.ps1)
 PROCEDURE.md           Full technical explanation and manual steps
 TEST_STATUS.md         Verification notes (works with Secure Boot ON, test signing OFF)
 ```
@@ -113,6 +117,16 @@ TEST_STATUS.md         Verification notes (works with Secure Boot ON, test signi
 - Administrator rights
 - The in-box `mtkwl6ex` Windows 10 driver available (see *About the driver*)
 - Ability to change BIOS/UEFI settings (Secure Boot)
+
+## Security notes
+
+- The signing certificate's **private key is deleted** right after the driver catalog is
+  signed, so nothing on your PC can be signed with it afterwards. Only the public
+  certificate stays in the trusted stores. Upgrading from v1.0.0? Running v1.1.0 once
+  removes the key v1.0.0 left behind; or delete it by hand: `certlm.msc` → Personal →
+  Certificates → `MTKDriverCert` → Delete.
+- Works on non-English Windows: driver and boot-option checks no longer depend on
+  English command output.
 
 ## ⚠️ Disclaimer
 

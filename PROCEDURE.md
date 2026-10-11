@@ -132,19 +132,28 @@ normally from the taskbar.
 - Network scan found 43 SSIDs. Wi-Fi fully functional, still on Windows 10.
 
 ## 5. Notes / caveats
-- **Test signing stays ON.** Turning it off (`bcdedit /set testsigning off`) makes the
-  test-signed driver stop loading. Leave it on unless you obtain a properly trusted
-  signature.
+- **Test signing does NOT need to stay on.** Verified on 2026-06-24 (see
+  [`TEST_STATUS.md`](TEST_STATUS.md)): after installing, turn test signing off
+  (`bcdedit /set testsigning off`, reboot) and re-enable Secure Boot. `mtkwl6ex.sys`
+  keeps loading on its embedded Microsoft signature; only the catalog was self-signed,
+  and the catalog is checked when the package is installed, not on every boot.
+- **The signing key is deleted right after use.** The self-signed certificate's
+  private key is only needed to sign the one catalog. Since v1.1.0 the tool creates a
+  non-exportable key, signs, and deletes it from `LocalMachine\My` straight away (and
+  removes keys left behind by v1.0.0). Only the public certificate stays trusted, which
+  cannot be used to sign anything.
 - This is a **workaround**. The clean/official fix is to install Windows 11 (this
   hardware was designed for it), but the workaround keeps you on Win10 with working Wi-Fi.
 - Driver MODE: we used `MTK7925_MODE1.ndi`, which matched the other `DEV_7925`
   subsystems in the Win10 INF. It works for this board. If a future board variant
   misbehaves, the alternative section is `MTK7925_DEFAULT.ndi`.
+- The subsystem line is added to **every** models section of the INF that lists
+  `DEV_7925` (each OS-decorated section), so Windows finds it whichever section it reads.
 
-## 6. Files in this folder
-- `driver/` — the **patched, signed Win10 driver package** that fixed it
-  (`mtkwl6ex.inf` with our subsystem added + re-signed `mtkwl6ex.cat`).
-- `Fix-MT7925-WiFi.ps1` — automation program that reproduces this whole procedure.
-- `logs/` — install/verification logs from the actual fix.
-- `historical/` — the failed Windows 11 driver attempt (`mtkwecx`) and original notes,
-  kept for reference (do not use; KMDF 1.33 wall).
+## 6. Files
+- `engine/MT7925-Core.ps1` - all the logic above, shared by the GUI and the CLI.
+- `MT7925-Fix-GUI.ps1` / `Fix-MT7925-WiFi.ps1` - the two front-ends.
+- `tests/Run-Tests.ps1` - unit tests for the decision table, INF patching and
+  localized `bcdedit` parsing (no admin or hardware needed).
+- Not in the repo on purpose: the patched driver package, run logs and the failed
+  `mtkwecx` attempt from the original fix (proprietary binaries / personal data).

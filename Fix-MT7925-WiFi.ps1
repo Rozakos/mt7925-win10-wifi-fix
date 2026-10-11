@@ -77,6 +77,10 @@ switch ($state.Phase) {
         }
         exit 0
     }
+    'RebootPending' {
+        Write-MTLog 'Test signing was changed but the PC has not rebooted yet. Reboot, then re-run this script.' 'warn'
+        exit 0
+    }
     'NeedSecureBootOff' {
         Write-MTLog 'Secure Boot is ENABLED. Disable it in BIOS/UEFI, reboot, then re-run this script.' 'warn'
         exit 2

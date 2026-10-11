@@ -94,40 +94,122 @@ function Test-MTSecureBoot {
     try { return [bool](Confirm-SecureBootUEFI) } catch { return $false }
 }
 
+# bcdedit localizes its Yes/No values (Ja, Oui, Greek Nai, ...), so the element name
+# is matched literally and the value against every yes-word we know of.
+$script:MTBcdYes = 'Yes|Ja|Oui|S[i\u00ED]|Sim|\u039D\u03B1\u03B9|\u0414\u0430|\u0422\u0430\u043A|Tak|Evet|Ano|\u00C1no|Igen|Kyll\u00E4|Jah|Taip|J\u0101|Da|\u306F\u3044|\u662F|\uC608'   # .NET regex \uXXXX escapes keep this file ASCII
+
+function ConvertFrom-MTBcdTestSigning {
+    <# Pure: does this 'bcdedit /enum {current}' text have testsigning set to yes? #>
+    param([string]$BcdText)
+    $BcdText -match "(?im)^\s*testsigning\s+($script:MTBcdYes)\s*$"
+}
+
 function Test-MTTestSigning {
-    ((bcdedit /enum '{current}') -join "`n") -match '(?im)^\s*testsigning\s+Yes'
+    # Configured for the NEXT boot (what bcdedit says).
+    ConvertFrom-MTBcdTestSigning ((bcdedit /enum '{current}') -join "`n")
+}
+
+function Test-MTTestSigningActive {
+    # In effect for THIS boot. The loader records boot options here; the value
+    # is language-independent (" ... TESTSIGNING ..." when test mode is on).
+    $opts = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control' -Name SystemStartOptions -ErrorAction SilentlyContinue).SystemStartOptions
+    [bool]($opts -match '(^|\s)TESTSIGNING(\s|$)')
+}
+
+function Get-MTPhase {
+    <#
+        Pure decision table (unit-tested in tests\Run-Tests.ps1):
+          NoDevice | RebootPending | NeedSecureBootOff | NeedTestSigning |
+          ReadyToInstall | WorkingHardenPending | NeedSecureBootOn | Done
+        RebootPending: test signing was switched on or off but the PC has not
+        rebooted yet. Installing then would stage a driver that cannot load.
+    #>
+    param(
+        [bool]$DevicePresent,
+        [bool]$DeviceOK,
+        [bool]$SecureBoot,
+        [bool]$TestSigningConfigured,
+        [bool]$TestSigningActive
+    )
+    if (-not $DevicePresent) { return 'NoDevice' }
+    if ($TestSigningConfigured -ne $TestSigningActive) { return 'RebootPending' }
+    if ($DeviceOK) {
+        if ($TestSigningActive)  { return 'WorkingHardenPending' }   # works, test signing still on
+        if (-not $SecureBoot)    { return 'NeedSecureBootOn' }       # secure: re-enable Secure Boot
+        return 'Done'                                                # Secure Boot ON + test signing OFF
+    }
+    if ($SecureBoot)             { return 'NeedSecureBootOff' }      # can't load a self-signed catalog yet
+    if (-not $TestSigningActive) { return 'NeedTestSigning' }        # enable test signing, reboot
+    return 'ReadyToInstall'                                          # build + sign + install now
 }
 
 function Get-MTState {
-    <#
-        One call that snapshots everything the UI needs to pick the next step.
-        Also computes a 'Phase' string the front-end can switch on:
-          NoDevice | NeedSecureBootOff | NeedTestSigning | ReadyToInstall |
-          WorkingHardenPending | NeedSecureBootOn | Done
-    #>
+    <# One call that snapshots everything the UI needs to pick the next step. #>
     $dev = Get-MTDevice
     $sb  = Test-MTSecureBoot
     $ts  = Test-MTTestSigning
-    $ok  = ($dev -and $dev.Status -eq 'OK' -and $dev.Problem -eq 'CM_PROB_NONE')
-
-    $phase =
-        if (-not $dev)            { 'NoDevice' }
-        elseif ($ok) {
-            if     ($ts)          { 'WorkingHardenPending' }   # works, but test signing still on
-            elseif (-not $sb)     { 'NeedSecureBootOn' }       # secure: just re-enable Secure Boot
-            else                  { 'Done' }                   # Secure Boot ON + test signing OFF
-        }
-        elseif ($sb)              { 'NeedSecureBootOff' }      # can't load a test-signed driver yet
-        elseif (-not $ts)         { 'NeedTestSigning' }        # enable test signing, reboot
-        else                      { 'ReadyToInstall' }         # build + sign + install now
+    $tsa = Test-MTTestSigningActive
+    $ok  = [bool]($dev -and $dev.Status -eq 'OK' -and $dev.Problem -eq 'CM_PROB_NONE')
 
     [pscustomobject]@{
-        Device      = $dev
-        SecureBoot  = $sb
-        TestSigning = $ts
-        DeviceOK    = $ok
-        IsAdmin     = (Test-MTAdmin)
-        Phase       = $phase
+        Device            = $dev
+        SecureBoot        = $sb
+        TestSigning       = $ts
+        TestSigningActive = $tsa
+        DeviceOK          = $ok
+        IsAdmin           = (Test-MTAdmin)
+        Phase             = (Get-MTPhase -DevicePresent ([bool]$dev) -DeviceOK $ok -SecureBoot $sb `
+                                         -TestSigningConfigured $ts -TestSigningActive $tsa)
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Pure helpers (unit-tested)
+# ---------------------------------------------------------------------------
+function Add-MTSubsysToInf {
+    <#
+        Returns @{ Lines = [string[]]; Added = <sections patched>; AlreadyPresent = bool }.
+        Adds 'SUBSYS_<id>' and 'SUBSYS_<id>&REV_00' copies of the first
+        DEV_<dev>&SUBSYS_ line in EVERY [models] section that has one. Patching
+        only the first section in the file could hit a section decorated for
+        another OS build (e.g. ...22000) that Windows 10 never reads.
+    #>
+    param([string[]]$Lines, [string]$Dev, [string]$Subsys)
+    if (($Lines -join "`n") -match [regex]::Escape("SUBSYS_$Subsys")) {
+        return @{ Lines = $Lines; Added = 0; AlreadyPresent = $true }
+    }
+    $out = New-Object System.Collections.Generic.List[string]
+    $patched = 0; $doneInSection = $false
+    foreach ($l in $Lines) {
+        $out.Add($l)
+        if ($l -match '^\s*\[') { $doneInSection = $false; continue }   # new section
+        if (-not $doneInSection -and $l -match "DEV_$Dev&SUBSYS_[0-9A-Fa-f]{8}\s*$") {
+            $out.Add(($l -replace 'SUBSYS_[0-9A-Fa-f]{8}', "SUBSYS_$Subsys"))
+            $out.Add(($l -replace 'SUBSYS_[0-9A-Fa-f]{8}', "SUBSYS_$Subsys&REV_00"))
+            $doneInSection = $true; $patched++
+        }
+    }
+    @{ Lines = $out.ToArray(); Added = $patched; AlreadyPresent = $false }
+}
+
+function Get-MTCompetingDrivers {
+    <#
+        Published names (oemNN.inf) of every staged Windows 11 'mtkwecx' package.
+        Uses DISM objects (language-independent); falls back to parsing
+        'pnputil /enum-drivers', whose labels are only English on English Windows.
+    #>
+    try {
+        return @(Get-WindowsDriver -Online -All -ErrorAction Stop |
+                 Where-Object { [IO.Path]::GetFileName($_.OriginalFileName) -ieq 'mtkwecx.inf' -and $_.Driver -match '^oem\d+\.inf$' } |
+                 ForEach-Object { $_.Driver } | Sort-Object -Unique)
+    } catch {
+        Write-MTLog 'Get-WindowsDriver unavailable; parsing pnputil output instead.' 'warn'
+        $found = @(); $published = $null
+        foreach ($ln in (pnputil /enum-drivers)) {
+            if ($ln -match '(oem\d+\.inf)') { $published = $Matches[1] }
+            if ($published -and $ln -match 'mtkwecx\.inf') { $found += $published; $published = $null }
+        }
+        return @($found | Sort-Object -Unique)
     }
 }
 
@@ -150,6 +232,17 @@ function Disable-MTTestSigning {
     Write-MTLog 'Test signing disabled. REBOOT; the driver keeps working on its embedded' 'good'
     Write-MTLog 'Microsoft signature. After reboot you can re-enable Secure Boot in BIOS.' 'good'
     $true
+}
+
+function Remove-MTSigningKeys {
+    <# Delete our signing certificate(s) WITH their private key from LocalMachine\My. #>
+    param([string]$CertSubject = 'CN=MTKDriverCert')
+    Get-ChildItem Cert:\LocalMachine\My -ErrorAction SilentlyContinue |
+        Where-Object { $_.Subject -eq $CertSubject } |
+        ForEach-Object {
+            Remove-Item -Path "Cert:\LocalMachine\My\$($_.Thumbprint)" -DeleteKey -ErrorAction SilentlyContinue
+            Write-MTLog "Deleted signing key $($_.Thumbprint.Substring(0,8))... from the machine store." 'info'
+        }
 }
 
 function Invoke-MTInstall {
@@ -194,35 +287,29 @@ function Invoke-MTInstall {
 
         # --- inject this board's subsystem into the INF (UTF-16 LE) -----------
         $idLine = "PCI\VEN_$VEN&DEV_$DEV&SUBSYS_$subsys"
-        $lines  = [System.IO.File]::ReadAllLines($inf)
-        if ($lines -match [regex]::Escape("SUBSYS_$subsys")) {
+        $patch = Add-MTSubsysToInf -Lines ([System.IO.File]::ReadAllLines($inf)) -Dev $DEV -Subsys $subsys
+        if ($patch.AlreadyPresent) {
             Write-MTLog 'Subsystem already present in INF; no edit needed.' 'good'
+        } elseif ($patch.Added -eq 0) {
+            Write-MTLog "Could not find a DEV_$DEV anchor line in the INF." 'error'; return $false
         } else {
-            $out = New-Object System.Collections.Generic.List[string]
-            $done = $false
-            foreach ($l in $lines) {
-                $out.Add($l)
-                if (-not $done -and $l -match "DEV_$DEV&SUBSYS_[0-9A-Fa-f]{8}\s*$") {
-                    $out.Add(($l -replace 'SUBSYS_[0-9A-Fa-f]{8}', "SUBSYS_$subsys"))
-                    $out.Add(($l -replace 'SUBSYS_[0-9A-Fa-f]{8}', "SUBSYS_$subsys&REV_00"))
-                    $done = $true
-                }
-            }
-            if (-not $done) { Write-MTLog "Could not find a DEV_$DEV anchor line in the INF." 'error'; return $false }
             $enc = New-Object System.Text.UnicodeEncoding($false, $true)   # UTF-16 LE + BOM
-            [System.IO.File]::WriteAllLines($inf, $out, $enc)
-            Write-MTLog "Injected $idLine into the INF." 'good'
+            [System.IO.File]::WriteAllLines($inf, $patch.Lines, $enc)
+            Write-MTLog "Injected $idLine into $($patch.Added) INF models section(s)." 'good'
         }
 
         # --- code-signing certificate (create+trust or reuse) -----------------
-        $cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.Subject -eq $CertSubject } | Select-Object -First 1
-        if (-not $cert) {
-            Write-MTLog "Creating self-signed code-signing certificate $CertSubject ..."
-            $cert = New-SelfSignedCertificate -Subject $CertSubject -Type CodeSigning `
-                    -CertStoreLocation 'Cert:\LocalMachine\My' -HashAlgorithm SHA256
-        } else {
-            Write-MTLog "Reusing certificate (thumbprint $($cert.Thumbprint))."
-        }
+        # The private key is only needed for the one catalog signature below.
+        # Older versions left it in LocalMachine\My for good, next to a copy of
+        # the certificate trusted as a Root CA: anything that could read that key
+        # could sign code this PC trusts. Clear such leftovers, then use a fresh
+        # non-exportable key that is deleted right after signing. Only the
+        # public certificate stays trusted (needed for the staged package).
+        Remove-MTSigningKeys -CertSubject $CertSubject
+        Write-MTLog "Creating a one-time code-signing certificate $CertSubject ..."
+        $cert = New-SelfSignedCertificate -Subject $CertSubject -Type CodeSigning `
+                -CertStoreLocation 'Cert:\LocalMachine\My' -HashAlgorithm SHA256 `
+                -KeyExportPolicy NonExportable -NotAfter (Get-Date).AddYears(10)
         foreach ($storeName in 'Root', 'TrustedPublisher') {
             $st = New-Object Security.Cryptography.X509Certificates.X509Store($storeName, 'LocalMachine')
             $st.Open('ReadWrite')
@@ -240,20 +327,14 @@ function Invoke-MTInstall {
         New-FileCatalog -Path $work -CatalogFilePath $tmpCat -CatalogVersion 2 | Out-Null
         Copy-Item $tmpCat $cat -Force
         $r = Set-AuthenticodeSignature -FilePath $cat -Certificate $cert -HashAlgorithm SHA256
+        Remove-MTSigningKeys -CertSubject $CertSubject   # key no longer needed, whatever happened
         if ($r.Status -ne 'Valid') { Write-MTLog "Catalog signing failed ($($r.Status))." 'error'; return $false }
-        Write-MTLog "Catalog signature status: $($r.Status)" 'good'
+        Write-MTLog "Catalog signature status: $($r.Status) (signing key deleted)" 'good'
 
         # --- remove competing Win11 'mtkwecx' packages (they out-rank) --------
-        $enum = pnputil /enum-drivers
-        $published = $null; $isMtkwecx = $false
-        foreach ($ln in $enum) {
-            if ($ln -match 'Published Name\s*:\s*(oem\d+\.inf)') { $published = $Matches[1]; $isMtkwecx = $false }
-            if ($ln -match 'Original Name\s*:\s*mtkwecx\.inf')   { $isMtkwecx = $true }
-            if ($isMtkwecx -and $published) {
-                Write-MTLog "Removing competing Win11 driver $published (mtkwecx) ..." 'warn'
-                pnputil /delete-driver $published /uninstall /force | Out-Null
-                $published = $null; $isMtkwecx = $false
-            }
+        foreach ($published in (Get-MTCompetingDrivers)) {
+            Write-MTLog "Removing competing Win11 driver $published (mtkwecx) ..." 'warn'
+            pnputil /delete-driver $published /uninstall /force | Out-Null
         }
 
         # --- install, rescan, verify -----------------------------------------

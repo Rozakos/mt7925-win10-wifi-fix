@@ -265,6 +265,11 @@ function Refresh-State {
             $lblInstruct.Text = "STEP 1 - Disable Secure Boot. The patched driver is self-signed and cannot load while Secure Boot is ON. Reboot into BIOS/UEFI, set Secure Boot to Disabled, save & exit, then click Re-check."
             $btnPrimary.Text = 'How to open BIOS'; $script:primaryAction = 'biosoff'
         }
+        'RebootPending' {
+            $lblInstruct.Text = "Restart needed. Test signing was just switched $(if ($state.TestSigning) {'ON'} else {'OFF'}), but Windows only applies that after a reboot. Restart now, then open this tool again."
+            $btnPrimary.Text = 'Restart now'; $script:primaryAction = 'reboot'
+            $btnPrimary.BackColor = [System.Drawing.Color]::FromArgb(255, 240, 200)
+        }
         'NeedTestSigning' {
             $lblInstruct.Text = "STEP 2 - Enable test signing. This lets the self-signed driver load. It needs one reboot; a harmless 'Test Mode' watermark will appear. Click below, then reboot when prompted."
             $btnPrimary.Text = 'Enable test signing'; $script:primaryAction = 'enable'
@@ -297,6 +302,7 @@ function Refresh-State {
 # ---------------------------------------------------------------------------
 $btnPrimary.Add_Click({
     switch ($script:primaryAction) {
+        'reboot'  { Confirm-Reboot 'Windows needs to restart to apply the test-signing change.' }
         'enable'  { Start-Worker 'enable' }
         'disable' { Start-Worker 'disable' }
         'install' {

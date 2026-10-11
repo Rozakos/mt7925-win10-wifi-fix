@@ -34,7 +34,8 @@ front-ends stay in sync — don't duplicate logic into a front-end.
 
 The engine emits all progress through a pluggable log sink (`Set-MTLogSink`), so the
 same functions can print to a console, a file, or stream into the GUI. Read-only state
-queries (`Get-MTState`, `Get-MTDevice`, `Test-MTSecureBoot`, `Test-MTTestSigning`) have
+queries (`Get-MTState`, `Get-MTDevice`, `Test-MTSecureBoot`, `Test-MTTestSigning`,
+`Test-MTTestSigningActive`) have
 no side effects and drive the phase state machine; the action functions
 (`Enable-MTTestSigning`, `Invoke-MTInstall`, `Disable-MTTestSigning`) require admin.
 
@@ -72,10 +73,18 @@ foreach ($f in 'engine\MT7925-Core.ps1','MT7925-Fix-GUI.ps1','Fix-MT7925-WiFi.ps
     if ($errs) { "ERRORS in $f:"; $errs } else { "OK: $f" }
 }
 
-# 2. Exercise the read-only engine state (safe; no changes)
+# 2. Unit tests: phase table, INF patching, localized bcdedit parsing
+powershell -ExecutionPolicy Bypass -File .\tests\Run-Tests.ps1
+
+# 3. Exercise the read-only engine state (safe; no changes)
 . .\engine\MT7925-Core.ps1
 Get-MTState | Format-List
 ```
+
+Keep decisions in pure functions (`Get-MTPhase`, `Add-MTSubsysToInf`,
+`ConvertFrom-MTBcdTestSigning`) and add a case to `tests\Run-Tests.ps1` when you change them.
+Never parse localized command output (`pnputil`, `bcdedit` values): Greek, German, ...
+Windows print different words. Prefer objects (`Get-WindowsDriver`) or registry values.
 
 If you changed install behavior, please note in the PR how you tested it (ideally on a
 real MT7925 machine) — the install path makes system changes and can't be fully
