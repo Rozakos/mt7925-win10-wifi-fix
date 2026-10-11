@@ -55,6 +55,8 @@ if (-not (Test-MTAdmin)) {
     exit 1
 }
 Write-MTLog "MT7925 Wi-Fi auto-fix starting. Log: $logFile" 'step'
+# v1.0.0 left its signing key in the machine store; it is never needed again.
+Remove-MTSigningKeys -CertSubject $CertSubject
 
 $state = Get-MTState
 if ($state.Device) {

@@ -358,6 +358,15 @@ if (-not (Test-MTAdmin)) {
 $form.Add_Shown({
     Append-Log 'MT7925 Wi-Fi Fix started.' 'step'
     Append-Log "Log file: $logFile" 'info'
+    # v1.0.0 left its signing key in the machine store; it is never needed again.
+    if (Test-MTAdmin) {
+        $leftover = @(Get-ChildItem Cert:\LocalMachine\My -ErrorAction SilentlyContinue |
+                      Where-Object { $_.Subject -eq 'CN=MTKDriverCert' })
+        if ($leftover.Count -gt 0) {
+            Remove-MTSigningKeys -CertSubject 'CN=MTKDriverCert'
+            Append-Log 'Removed a leftover driver-signing key from an earlier version.' 'good'
+        }
+    }
     Refresh-State
 })
 [void]$form.ShowDialog()
