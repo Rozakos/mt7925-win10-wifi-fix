@@ -94,6 +94,27 @@ function Test-MTSecureBoot {
     try { return [bool](Confirm-SecureBootUEFI) } catch { return $false }
 }
 
+function Test-MTBitLocker {
+    # $true when the Windows drive is protected by BitLocker / device encryption.
+    # Asked through WMI: language-independent and also present on Home editions.
+    # Needs admin; $false when it cannot be determined.
+    try {
+        $vol = Get-CimInstance -Namespace 'root\cimv2\Security\MicrosoftVolumeEncryption' `
+                   -ClassName Win32_EncryptableVolume -ErrorAction Stop |
+               Where-Object { $_.DriveLetter -eq $env:SystemDrive } | Select-Object -First 1
+        return [bool]($vol -and $vol.ProtectionStatus -eq 1)
+    } catch { return $false }
+}
+
+function Get-MTBitLockerWarning {
+    <# Pure: the text both front-ends show before the user changes Secure Boot. #>
+    param([bool]$Protected)
+    if ($Protected) {
+        return 'BitLocker is ON for the Windows drive. Changing Secure Boot can make Windows ask for the 48-digit BitLocker recovery key at the next boot. Get the key FIRST: https://account.microsoft.com/devices/recoverykey'
+    }
+    'If this drive is encrypted with BitLocker, have its recovery key ready before changing Secure Boot.'
+}
+
 # bcdedit localizes its Yes/No values (Ja, Oui, Greek Nai, ...), so the element name
 # is matched literally and the value against every yes-word we know of.
 $script:MTBcdYes = 'Yes|Ja|Oui|S[i\u00ED]|Sim|\u039D\u03B1\u03B9|\u0414\u0430|\u0422\u0430\u043A|Tak|Evet|Ano|\u00C1no|Igen|Kyll\u00E4|Jah|Taip|J\u0101|Da|\u306F\u3044|\u662F|\uC608'   # .NET regex \uXXXX escapes keep this file ASCII
@@ -154,6 +175,7 @@ function Get-MTState {
     [pscustomobject]@{
         Device            = $dev
         SecureBoot        = $sb
+        BitLocker         = (Test-MTBitLocker)
         TestSigning       = $ts
         TestSigningActive = $tsa
         DeviceOK          = $ok

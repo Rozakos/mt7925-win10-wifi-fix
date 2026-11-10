@@ -76,6 +76,7 @@ switch ($state.Phase) {
             Write-MTLog 'Optional: run with test signing still ON; you may disable it (bcdedit /set testsigning off) and reboot.' 'info'
         } elseif ($state.Phase -eq 'NeedSecureBootOn') {
             Write-MTLog 'Optional: re-enable Secure Boot in BIOS for full security; the adapter will keep working.' 'info'
+            Write-MTLog (Get-MTBitLockerWarning -Protected $state.BitLocker) $(if ($state.BitLocker) { 'warn' } else { 'info' })
         }
         exit 0
     }
@@ -85,6 +86,7 @@ switch ($state.Phase) {
     }
     'NeedSecureBootOff' {
         Write-MTLog 'Secure Boot is ENABLED. Disable it in BIOS/UEFI, reboot, then re-run this script.' 'warn'
+        Write-MTLog (Get-MTBitLockerWarning -Protected $state.BitLocker) $(if ($state.BitLocker) { 'warn' } else { 'info' })
         exit 2
     }
     'NeedTestSigning' {

@@ -64,7 +64,9 @@ any MT7925 laptop (Lenovo, HP, Dell, Asus, …), not just one model.
 > **BitLocker / device encryption:** changing Secure Boot can make Windows ask for your
 > BitLocker recovery key at the next boot. Before step 1, make sure you have the key
 > (https://account.microsoft.com/devices/recoverykey) or suspend BitLocker first
-> (`manage-bde -protectors -disable C:` from an elevated prompt).
+> (`manage-bde -protectors -disable C:` from an elevated prompt, and
+> `manage-bde -protectors -enable C:` when you are done). The tool detects BitLocker on
+> the Windows drive and warns you at the Secure Boot steps.
 
 The tool can't change Secure Boot itself (no Windows program can — it's a firmware
 setting, by design), so steps 1 and 5 are done in BIOS and the tool **verifies** them

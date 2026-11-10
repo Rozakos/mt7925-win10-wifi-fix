@@ -258,10 +258,13 @@ function On-WorkerDone([string]$action, [bool]$ok) {
 function Refresh-State {
     $state = Get-MTState
     Set-StatusColors $state
+    $script:bitLocker = [bool]$state.BitLocker
+    $bitLockerNote = if ($script:bitLocker) { ' BitLocker is ON: get your recovery key first (details on the button).' } else { '' }
 
     # default button look
     $btnPrimary.Enabled  = $true
     $btnPrimary.BackColor = [System.Drawing.SystemColors]::Control
+    $lblInstruct.ForeColor = [System.Drawing.SystemColors]::ControlText
     $script:primaryAction = $null
 
     switch ($state.Phase) {
@@ -270,7 +273,8 @@ function Refresh-State {
             $btnPrimary.Text = 'No adapter'; $btnPrimary.Enabled = $false
         }
         'NeedSecureBootOff' {
-            $lblInstruct.Text = "STEP 1 - Disable Secure Boot. The patched driver is self-signed and cannot load while Secure Boot is ON. Reboot into BIOS/UEFI, set Secure Boot to Disabled, save & exit, then click Re-check."
+            $lblInstruct.Text = "STEP 1 - Disable Secure Boot. The patched driver is self-signed and cannot load while Secure Boot is ON. Reboot into BIOS/UEFI, set Secure Boot to Disabled, save & exit, then click Re-check.$bitLockerNote"
+            if ($script:bitLocker) { $lblInstruct.ForeColor = [System.Drawing.Color]::Firebrick }
             $btnPrimary.Text = 'How to open BIOS'; $script:primaryAction = 'biosoff'
         }
         'RebootPending' {
@@ -294,7 +298,8 @@ function Refresh-State {
             $btnPrimary.BackColor = [System.Drawing.Color]::FromArgb(210, 245, 215)
         }
         'NeedSecureBootOn' {
-            $lblInstruct.Text = "Almost done - Wi-Fi works with test signing OFF. STEP 5 (recommended) - Re-enable Secure Boot in BIOS/UEFI for full security, reboot, then click Re-check. The adapter will keep working."
+            $lblInstruct.Text = "Almost done - Wi-Fi works with test signing OFF. STEP 5 (recommended) - Re-enable Secure Boot in BIOS/UEFI for full security, reboot, then click Re-check. The adapter will keep working.$bitLockerNote"
+            if ($script:bitLocker) { $lblInstruct.ForeColor = [System.Drawing.Color]::Firebrick }
             $btnPrimary.Text = 'How to open BIOS'; $script:primaryAction = 'bioson'
         }
         'Done' {
@@ -321,13 +326,13 @@ $btnPrimary.Add_Click({
         }
         'biosoff' {
             [System.Windows.Forms.MessageBox]::Show(
-                "To disable Secure Boot:`n`n1. Reboot and enter BIOS/UEFI (usually F2, F1, Del, or Esc at power-on; on many laptops: Settings > Update & Security > Recovery > Restart now > Troubleshoot > UEFI Firmware Settings).`n2. Find Secure Boot (often under Security or Boot).`n3. Set it to Disabled. Save & Exit.`n4. Back in Windows, open this tool and click Re-check.",
-                'Disable Secure Boot in BIOS', 'OK', 'Information') | Out-Null
+                "$(Get-MTBitLockerWarning -Protected $script:bitLocker)`n`nTo disable Secure Boot:`n`n1. Reboot and enter BIOS/UEFI (usually F2, F1, Del, or Esc at power-on; on many laptops: Settings > Update & Security > Recovery > Restart now > Troubleshoot > UEFI Firmware Settings).`n2. Find Secure Boot (often under Security or Boot).`n3. Set it to Disabled. Save & Exit.`n4. Back in Windows, open this tool and click Re-check.",
+                'Disable Secure Boot in BIOS', 'OK', $(if ($script:bitLocker) { 'Warning' } else { 'Information' })) | Out-Null
         }
         'bioson' {
             [System.Windows.Forms.MessageBox]::Show(
-                "To re-enable Secure Boot:`n`n1. Reboot into BIOS/UEFI (F2/F1/Del/Esc, or Settings > Update & Security > Recovery > Restart now > Troubleshoot > UEFI Firmware Settings).`n2. Set Secure Boot to Enabled. Save & Exit.`n3. Back in Windows, open this tool and click Re-check to confirm Wi-Fi still works.",
-                'Re-enable Secure Boot in BIOS', 'OK', 'Information') | Out-Null
+                "$(Get-MTBitLockerWarning -Protected $script:bitLocker)`n`nTo re-enable Secure Boot:`n`n1. Reboot into BIOS/UEFI (F2/F1/Del/Esc, or Settings > Update & Security > Recovery > Restart now > Troubleshoot > UEFI Firmware Settings).`n2. Set Secure Boot to Enabled. Save & Exit.`n3. Back in Windows, open this tool and click Re-check to confirm Wi-Fi still works.",
+                'Re-enable Secure Boot in BIOS', 'OK', $(if ($script:bitLocker) { 'Warning' } else { 'Information' })) | Out-Null
         }
     }
 })

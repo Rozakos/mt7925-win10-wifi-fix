@@ -74,6 +74,11 @@ $again = Add-MTSubsysToInf -Lines $r.Lines -Dev '7925' -Subsys 'E0FF17AA'
 Assert-Equal 'idempotent' $true $again.AlreadyPresent
 Assert-Equal 'no anchor -> nothing added' 0 (Add-MTSubsysToInf -Lines @('[x]', 'foo') -Dev '7925' -Subsys 'E0FF17AA').Added
 
+# --- BitLocker warning text -------------------------------------------------
+Assert-Equal 'BitLocker ON warning names the recovery key page' $true ((Get-MTBitLockerWarning -Protected $true) -match 'BitLocker is ON.*recoverykey')
+Assert-Equal 'BitLocker unknown/off still gives a hint' $true ((Get-MTBitLockerWarning -Protected $false) -match 'recovery key')
+Assert-Equal 'Test-MTBitLocker returns a boolean and never throws' $true ((Test-MTBitLocker) -is [bool])
+
 # --- driver package selection ----------------------------------------------
 $pkgRoot = Join-Path $env:TEMP ("mt7925-tests-" + [guid]::NewGuid().ToString('N'))
 try {
