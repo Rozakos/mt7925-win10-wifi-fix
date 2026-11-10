@@ -73,6 +73,8 @@ Get-PnpDevice | Where-Object { $_.HardwareID -like "*14C3*7925*" } |
 
 **Phase 1 — Enable test signing (requires reboot)**
 Secure Boot must be OFF first (set in BIOS), otherwise `bcdedit` is blocked.
+If the drive is BitLocker-encrypted, have the recovery key ready or suspend BitLocker
+before changing Secure Boot, or Windows may ask for the key at the next boot.
 ```powershell
 bcdedit /set testsigning on
 # reboot
@@ -162,8 +164,9 @@ normally from the taskbar.
 - **v1.0.0 / v1.1.0** - the automated install step could not patch the INF: inside
   `Invoke-MTInstall` the device id `$DEV` and the device object `$dev` were the same
   variable (PowerShell names are case-insensitive), so the tool searched the INF for
-  the wrong text and stopped with "Could not find a DEV_ anchor line". The manual
-  steps above were never affected.
+  the wrong text and stopped with `Unexpected error: parsing "DEV_@{Found=True; ...`
+  (issues #1 and #2). The manual steps above were never affected; issue #2's reporter
+  confirmed the method by hand on an HP ProBook 4 G1a (`SUBSYS_8C37103C`, `REV_02`).
 - **v1.1.1** - fixes that, picks the right `mtkwl6ex` package when several exist, logs
   `pnputil` errors, and the GUI can no longer stay stuck on "busy".
 - Not in the repo on purpose: the patched driver package, run logs and the failed

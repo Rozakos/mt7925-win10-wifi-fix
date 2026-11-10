@@ -7,9 +7,10 @@
 
 **➡️ [Download the latest release](https://github.com/Rozakos/mt7925-win10-wifi-fix/releases/latest)** — extract the ZIP and double-click `Run-MT7925-GUI.bat`.
 
-> **Using v1.0.0 or v1.1.0?** Their install step (step 3) stops with *"Could not find a
-> DEV_ anchor line in the INF"* because of a script bug
-> ([#1](https://github.com/Rozakos/mt7925-win10-wifi-fix/issues/1)). It is fixed in
+> **Using v1.0.0 or v1.1.0?** Their install step (step 3) stops with *"Unexpected error:
+> parsing "DEV_@{Found=True; ..."* because of a script bug
+> ([#1](https://github.com/Rozakos/mt7925-win10-wifi-fix/issues/1),
+> [#2](https://github.com/Rozakos/mt7925-win10-wifi-fix/issues/2)). It is fixed in
 > **v1.1.1**: download the latest release and run it again from where you left off.
 
 Get the **MediaTek MT7925 Wi-Fi 7** adapter working on **Windows 10** when the laptop
@@ -60,6 +61,11 @@ any MT7925 laptop (Lenovo, HP, Dell, Asus, …), not just one model.
    If you switch test signing on or off and haven't rebooted yet, the tool says so and
    offers **Restart now** instead of letting you continue too early.
 
+> **BitLocker / device encryption:** changing Secure Boot can make Windows ask for your
+> BitLocker recovery key at the next boot. Before step 1, make sure you have the key
+> (https://account.microsoft.com/devices/recoverykey) or suspend BitLocker first
+> (`manage-bde -protectors -disable C:` from an elevated prompt).
+
 The tool can't change Secure Boot itself (no Windows program can — it's a firmware
 setting, by design), so steps 1 and 5 are done in BIOS and the tool **verifies** them
 for you with the **Re-check** button.
@@ -84,7 +90,9 @@ packages don't know this chip).
 
 If no such package is present on your machine, install it first via **Settings →
 Windows Update → Optional updates → Driver updates** (look for a MediaTek Wi-Fi entry),
-or point the tool at a folder containing it:
+or give the tool a folder containing it (`mtkwl6ex.inf` plus its `.sys`/`.dll`/`.dat`
+files). Either copy that package into a folder named **`driver`** next to the scripts
+(works for both the GUI and the CLI), or pass it to the CLI:
 
 ```powershell
 .\Fix-MT7925-WiFi.ps1 -DriverSource "C:\path\to\mtkwl6ex"
@@ -94,7 +102,8 @@ or point the tool at a folder containing it:
 
 | What you see | What it means / what to do |
 |--------------|----------------------------|
-| *"Could not find a DEV_ anchor line in the INF"* | On v1.0.0/v1.1.0 this is the script bug above: update to v1.1.1 or later. On a current version it means the driver folder you passed with `-DriverSource` doesn't support the MT7925. |
+| *"Unexpected error: parsing "DEV_@{Found=True; ..."* | The v1.0.0/v1.1.0 script bug above: update to v1.1.1 or later. |
+| *"Could not find a DEV_ anchor line in the INF"* | The driver folder you supplied (`driver` folder or `-DriverSource`) doesn't list the MT7925. Use a newer `mtkwl6ex` package. |
 | *"No Windows 10 'mtkwl6ex' driver that supports the MT7925 was found"* | Get the driver first: see *About the driver*. |
 | *"pnputil /add-driver exit code ..."* in the log | Windows refused or deferred the package; the lines under it are `pnputil`'s own explanation. Check that test signing is active (the tool shows it) and that you rebooted after enabling it. |
 | *"Driver installed but device is not OK"* | Open Device Manager for the adapter's error code, and Event Viewer → System. Please include both in a compatibility report. |
