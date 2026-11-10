@@ -158,6 +158,20 @@ TEST_STATUS.md         Verification notes (works with Secure Boot ON, test signi
   Certificates → `MTKDriverCert` → Delete.
 - Works on non-English Windows: driver and boot-option checks no longer depend on
   English command output.
+- Since v1.1.2 the tool warns before the Secure Boot steps if the Windows drive is
+  BitLocker-protected, so you can get your recovery key first.
+
+## Tested boards
+
+| Laptop | Subsystem | Result |
+|--------|-----------|--------|
+| Lenovo IdeaPad Slim 3 15ARP10 (83K7) | `SUBSYS_E0FF17AA` | Works (method done by hand) |
+| HP ProBook 4 G1a | `SUBSYS_8C37103C` | Works (method done by hand, [#2](https://github.com/Rozakos/mt7925-win10-wifi-fix/issues/2)) |
+
+The scripted install in v1.1.1 and later has not been confirmed on real hardware yet.
+If you run it, please file a
+[compatibility report](https://github.com/Rozakos/mt7925-win10-wifi-fix/issues/new/choose),
+whether it worked or not.
 
 ## ⚠️ Disclaimer
 

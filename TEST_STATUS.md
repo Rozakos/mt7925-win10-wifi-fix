@@ -22,10 +22,20 @@ and installed **by hand** (the steps in [`PROCEDURE.md`](PROCEDURE.md)). It prov
 method, not the scripts.
 
 The automated install step in v1.0.0 and v1.1.0 had a bug and could not patch the INF
-(issue #1). v1.1.1 fixes it; that fix is covered by the unit tests
-(`tests\Run-Tests.ps1`, 58 passing) but as of 2026-11-10 the scripted install has
-**not yet been re-run end to end on an MT7925 machine**. Compatibility reports for
-v1.1.1 are very welcome.
+(issues #1 and #2). v1.1.1 fixes it; that fix is covered by the unit tests
+(`tests\Run-Tests.ps1`) but as of 2026-11-10 the scripted install has **not yet been
+re-run end to end on an MT7925 machine**. Compatibility reports for v1.1.2 or later
+are very welcome.
+
+Boards where the manual method is confirmed:
+
+| Laptop | Hardware ID | Confirmed by |
+|--------|-------------|--------------|
+| Lenovo IdeaPad Slim 3 15ARP10 (83K7) | `SUBSYS_E0FF17AA`, `REV_00` | this repo, 2026-06-24 |
+| HP ProBook 4 G1a | `SUBSYS_8C37103C`, `REV_02` | issue #2, 2026-10 (Wi-Fi 6 tested) |
+
+The BitLocker warning added in v1.1.2 was checked with a simulated state only; its
+detection has not been exercised on a drive that has BitLocker on.
 
 ## What we're testing
 Whether the MT7925 driver still loads with **test signing OFF** (relying on the

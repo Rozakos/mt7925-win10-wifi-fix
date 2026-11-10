@@ -18,7 +18,8 @@ Open an issue with:
 - What you expected vs. what happened
 - The device's final Status/Problem and any error code (Code 28 / 37 / 39)
 - A relevant excerpt from the log the tool wrote (redact your MAC/SSID/BSSID)
-- Your Windows version (`winver`) and which front-end you used (GUI or CLI)
+- Your Windows version (`winver`), which front-end you used (GUI or CLI) and which
+  release (the version is in the ZIP/folder name, e.g. `1.1.2`)
 
 ## Project layout
 
@@ -35,7 +36,7 @@ front-ends stay in sync — don't duplicate logic into a front-end.
 The engine emits all progress through a pluggable log sink (`Set-MTLogSink`), so the
 same functions can print to a console, a file, or stream into the GUI. Read-only state
 queries (`Get-MTState`, `Get-MTDevice`, `Test-MTSecureBoot`, `Test-MTTestSigning`,
-`Test-MTTestSigningActive`) have
+`Test-MTTestSigningActive`, `Test-MTBitLocker`) have
 no side effects and drive the phase state machine; the action functions
 (`Enable-MTTestSigning`, `Invoke-MTInstall`, `Disable-MTTestSigning`) require admin.
 
@@ -87,7 +88,7 @@ Get-MTState | Format-List
 ```
 
 Keep decisions in pure functions (`Get-MTPhase`, `Add-MTSubsysToInf`,
-`Select-MTDriverPackage`, `ConvertFrom-MTBcdTestSigning`) and add a case to `tests\Run-Tests.ps1` when you change them.
+`Select-MTDriverPackage`, `Get-MTBitLockerWarning`, `ConvertFrom-MTBcdTestSigning`) and add a case to `tests\Run-Tests.ps1` when you change them.
 Never parse localized command output (`pnputil`, `bcdedit` values): Greek, German, ...
 Windows print different words. Prefer objects (`Get-WindowsDriver`) or registry values.
 

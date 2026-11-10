@@ -159,6 +159,8 @@ normally from the taskbar.
 - `MT7925-Fix-GUI.ps1` / `Fix-MT7925-WiFi.ps1` - the two front-ends.
 - `tests/Run-Tests.ps1` - unit tests for the decision table, INF patching, driver
   package choice and localized `bcdedit` parsing (no admin or hardware needed).
+- Not in the repo on purpose: the patched driver package, run logs and the failed
+  `mtkwecx` attempt from the original fix (proprietary binaries / personal data).
 
 ## 7. Tool history
 - **v1.0.0 / v1.1.0** - the automated install step could not patch the INF: inside
@@ -169,5 +171,5 @@ normally from the taskbar.
   confirmed the method by hand on an HP ProBook 4 G1a (`SUBSYS_8C37103C`, `REV_02`).
 - **v1.1.1** - fixes that, picks the right `mtkwl6ex` package when several exist, logs
   `pnputil` errors, and the GUI can no longer stay stuck on "busy".
-- Not in the repo on purpose: the patched driver package, run logs and the failed
-  `mtkwecx` attempt from the original fix (proprietary binaries / personal data).
+- **v1.1.2** - detects BitLocker on the Windows drive and warns before both Secure Boot
+  steps (GUI and CLI).
