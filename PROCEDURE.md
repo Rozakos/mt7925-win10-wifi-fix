@@ -89,6 +89,8 @@ $cert = New-SelfSignedCertificate -Subject "CN=MTKDriverCert" -Type CodeSigning 
 **Phase 3 — Build the patched Win10 driver package**
 1. Locate the in-box Win10 driver:
    `C:\Windows\System32\DriverStore\FileRepository\mtkwl6ex.inf_amd64_*`
+   (if there are several, use the newest one whose INF contains `DEV_7925`; the tool
+   does this automatically since v1.1.1)
 2. Copy the whole folder somewhere writable.
 3. In the copied `mtkwl6ex.inf` (UTF-16 LE), inside `[MediaTek.NTAMD64.10.0...16299]`,
    add a line next to the existing `DEV_7925` entries:
@@ -153,7 +155,16 @@ normally from the taskbar.
 ## 6. Files
 - `engine/MT7925-Core.ps1` - all the logic above, shared by the GUI and the CLI.
 - `MT7925-Fix-GUI.ps1` / `Fix-MT7925-WiFi.ps1` - the two front-ends.
-- `tests/Run-Tests.ps1` - unit tests for the decision table, INF patching and
-  localized `bcdedit` parsing (no admin or hardware needed).
+- `tests/Run-Tests.ps1` - unit tests for the decision table, INF patching, driver
+  package choice and localized `bcdedit` parsing (no admin or hardware needed).
+
+## 7. Tool history
+- **v1.0.0 / v1.1.0** - the automated install step could not patch the INF: inside
+  `Invoke-MTInstall` the device id `$DEV` and the device object `$dev` were the same
+  variable (PowerShell names are case-insensitive), so the tool searched the INF for
+  the wrong text and stopped with "Could not find a DEV_ anchor line". The manual
+  steps above were never affected.
+- **v1.1.1** - fixes that, picks the right `mtkwl6ex` package when several exist, logs
+  `pnputil` errors, and the GUI can no longer stay stuck on "busy".
 - Not in the repo on purpose: the patched driver package, run logs and the failed
   `mtkwecx` attempt from the original fix (proprietary binaries / personal data).

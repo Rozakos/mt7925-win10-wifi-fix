@@ -7,6 +7,11 @@
 
 **➡️ [Download the latest release](https://github.com/Rozakos/mt7925-win10-wifi-fix/releases/latest)** — extract the ZIP and double-click `Run-MT7925-GUI.bat`.
 
+> **Using v1.0.0 or v1.1.0?** Their install step (step 3) stops with *"Could not find a
+> DEV_ anchor line in the INF"* because of a script bug
+> ([#1](https://github.com/Rozakos/mt7925-win10-wifi-fix/issues/1)). It is fixed in
+> **v1.1.1**: download the latest release and run it again from where you left off.
+
 Get the **MediaTek MT7925 Wi-Fi 7** adapter working on **Windows 10** when the laptop
 shipped with **Windows 11-only drivers**, so the adapter fails to install.
 
@@ -73,15 +78,30 @@ Or double-click **`Run-Fix.bat`** (self-elevates).
 
 This repo **does not include** MediaTek's driver binaries — they're proprietary. The
 tool uses the **Windows 10 `mtkwl6ex` package already on your PC**, found under
-`C:\Windows\System32\DriverStore\FileRepository\mtkwl6ex.inf_amd64_*`.
+`C:\Windows\System32\DriverStore\FileRepository\mtkwl6ex.inf_amd64_*`. If several
+versions are there, it picks the newest one that lists the MT7925 (older `mtkwl6ex`
+packages don't know this chip).
 
-If that package isn't present on your machine, install it first via **Settings →
+If no such package is present on your machine, install it first via **Settings →
 Windows Update → Optional updates → Driver updates** (look for a MediaTek Wi-Fi entry),
 or point the tool at a folder containing it:
 
 ```powershell
 .\Fix-MT7925-WiFi.ps1 -DriverSource "C:\path\to\mtkwl6ex"
 ```
+
+## Troubleshooting
+
+| What you see | What it means / what to do |
+|--------------|----------------------------|
+| *"Could not find a DEV_ anchor line in the INF"* | On v1.0.0/v1.1.0 this is the script bug above: update to v1.1.1 or later. On a current version it means the driver folder you passed with `-DriverSource` doesn't support the MT7925. |
+| *"No Windows 10 'mtkwl6ex' driver that supports the MT7925 was found"* | Get the driver first: see *About the driver*. |
+| *"pnputil /add-driver exit code ..."* in the log | Windows refused or deferred the package; the lines under it are `pnputil`'s own explanation. Check that test signing is active (the tool shows it) and that you rebooted after enabling it. |
+| *"Driver installed but device is not OK"* | Open Device Manager for the adapter's error code, and Event Viewer → System. Please include both in a compatibility report. |
+| Wi-Fi works, then drops after a while | Not a known script problem. Try unchecking *Allow the computer to turn off this device to save power* (adapter → Power Management) and open an issue with your hardware ID and any Event Viewer errors. |
+
+Both front-ends write a log next to the scripts (`MT7925-GUI-*.log` / `Fix-MT7925-*.log`);
+the GUI's **Open log** button opens it. Redact your MAC/SSID before posting it.
 
 ## How it works (short version)
 
@@ -122,8 +142,8 @@ TEST_STATUS.md         Verification notes (works with Secure Boot ON, test signi
 
 - The signing certificate's **private key is deleted** right after the driver catalog is
   signed, so nothing on your PC can be signed with it afterwards. Only the public
-  certificate stays in the trusted stores. Upgrading from v1.0.0? Running v1.1.0 once
-  removes the key v1.0.0 left behind; or delete it by hand: `certlm.msc` → Personal →
+  certificate stays in the trusted stores. Upgrading from v1.0.0? Running v1.1.0 or
+  later once removes the key v1.0.0 left behind; or delete it by hand: `certlm.msc` → Personal →
   Certificates → `MTKDriverCert` → Delete.
 - Works on non-English Windows: driver and boot-option checks no longer depend on
   English command output.

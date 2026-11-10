@@ -46,6 +46,10 @@ no side effects and drive the phase state machine; the action functions
 - **ASCII only** in `.ps1` files, and save them **UTF-8 with BOM**. Non-ASCII
   characters (e.g. em dashes) without a BOM get mis-decoded by PS 5.1 and break
   parsing. Use `-` instead of `—`.
+- **Variable names are case-insensitive** in PowerShell: `$DEV` and `$dev` are the
+  same variable, and the second assignment silently overwrites the first (this broke
+  the install step in v1.0.0/v1.1.0, issue #1). The test suite fails if a function
+  uses two names that differ only by case.
 - Match the surrounding style: 4-space indent, comment-based help headers on scripts,
   short banner comments (`# --- section ---`) for sections.
 - Keep firmware steps (Secure Boot) as *guided + verified*, never assume they can be
@@ -73,7 +77,8 @@ foreach ($f in 'engine\MT7925-Core.ps1','MT7925-Fix-GUI.ps1','Fix-MT7925-WiFi.ps
     if ($errs) { "ERRORS in $f:"; $errs } else { "OK: $f" }
 }
 
-# 2. Unit tests: phase table, INF patching, localized bcdedit parsing
+# 2. Unit tests: phase table, INF patching, driver package choice, localized
+#    bcdedit parsing, and a check for variables that differ only by case
 powershell -ExecutionPolicy Bypass -File .\tests\Run-Tests.ps1
 
 # 3. Exercise the read-only engine state (safe; no changes)
@@ -82,7 +87,7 @@ Get-MTState | Format-List
 ```
 
 Keep decisions in pure functions (`Get-MTPhase`, `Add-MTSubsysToInf`,
-`ConvertFrom-MTBcdTestSigning`) and add a case to `tests\Run-Tests.ps1` when you change them.
+`Select-MTDriverPackage`, `ConvertFrom-MTBcdTestSigning`) and add a case to `tests\Run-Tests.ps1` when you change them.
 Never parse localized command output (`pnputil`, `bcdedit` values): Greek, German, ...
 Windows print different words. Prefer objects (`Get-WindowsDriver`) or registry values.
 

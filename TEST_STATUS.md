@@ -16,6 +16,17 @@ After re-enabling Secure Boot in BIOS and rebooting, verified live:
 relying solely on the embedded Microsoft signature in `mtkwl6ex.sys`. No security
 posture had to be weakened to keep Wi-Fi. This closes the last pending item.
 
+## Scope of this record
+Everything on this page was verified on the original machine with the driver patched
+and installed **by hand** (the steps in [`PROCEDURE.md`](PROCEDURE.md)). It proves the
+method, not the scripts.
+
+The automated install step in v1.0.0 and v1.1.0 had a bug and could not patch the INF
+(issue #1). v1.1.1 fixes it; that fix is covered by the unit tests
+(`tests\Run-Tests.ps1`, 58 passing) but as of 2026-11-10 the scripted install has
+**not yet been re-run end to end on an MT7925 machine**. Compatibility reports for
+v1.1.1 are very welcome.
+
 ## What we're testing
 Whether the MT7925 driver still loads with **test signing OFF** (relying on the
 Microsoft signature embedded in `mtkwl6ex.sys`, since only the catalog is self-signed).
