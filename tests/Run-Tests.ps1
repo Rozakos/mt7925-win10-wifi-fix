@@ -74,6 +74,30 @@ $again = Add-MTSubsysToInf -Lines $r.Lines -Dev '7925' -Subsys 'E0FF17AA'
 Assert-Equal 'idempotent' $true $again.AlreadyPresent
 Assert-Equal 'no anchor -> nothing added' 0 (Add-MTSubsysToInf -Lines @('[x]', 'foo') -Dev '7925' -Subsys 'E0FF17AA').Added
 
+# --- driver package selection ----------------------------------------------
+$pkgRoot = Join-Path $env:TEMP ("mt7925-tests-" + [guid]::NewGuid().ToString('N'))
+try {
+    $pkgs = @{
+        old      = @('DriverVer = 01/01/2023,3.3.0.100',  'x = y, PCI\VEN_14C3&DEV_7925&SUBSYS_7925144D')
+        new      = @('DriverVer=06/01/2024, 3.4.10.20',   'x = y, PCI\VEN_14C3&DEV_7925&SUBSYS_7925144D')
+        no7925   = @('DriverVer = 01/01/2025,9.9.9.9',    'x = y, PCI\VEN_14C3&DEV_0616&SUBSYS_E0CD17AA')
+        noinf    = $null
+    }
+    foreach ($name in $pkgs.Keys) {
+        $dir = Join-Path $pkgRoot $name
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        if ($pkgs[$name]) {
+            [System.IO.File]::WriteAllLines((Join-Path $dir 'mtkwl6ex.inf'), [string[]]$pkgs[$name], (New-Object System.Text.UnicodeEncoding($false, $true)))
+        }
+    }
+    $all = @('old', 'no7925', 'noinf', 'new') | ForEach-Object { Join-Path $pkgRoot $_ }
+    Assert-Equal 'picks newest package that lists DEV_7925' (Join-Path $pkgRoot 'new') (Select-MTDriverPackage -Folders $all -Dev '7925')
+    Assert-Equal 'no package lists the chip -> null' $true ($null -eq (Select-MTDriverPackage -Folders @((Join-Path $pkgRoot 'no7925'), (Join-Path $pkgRoot 'noinf')) -Dev '7925'))
+    Assert-Equal 'no candidates -> null' $true ($null -eq (Select-MTDriverPackage -Folders @() -Dev '7925'))
+} finally {
+    Remove-Item $pkgRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # --- no two variables in one function may differ only by case (issue #1) ----
 # PowerShell variable names are case-insensitive, so '$DEV' and '$dev' are the
 # same variable and the second assignment silently overwrites the first.

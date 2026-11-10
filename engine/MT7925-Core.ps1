@@ -192,6 +192,27 @@ function Add-MTSubsysToInf {
     @{ Lines = $out.ToArray(); Added = $patched; AlreadyPresent = $false }
 }
 
+function Select-MTDriverPackage {
+    <#
+        From candidate package folders, returns the one whose mtkwl6ex.inf lists
+        DEV_<dev> and has the highest DriverVer, or $null if none qualifies.
+        The DriverStore can hold several mtkwl6ex versions, and older ones do
+        not know the MT7925 at all, so "the first folder" is not good enough.
+    #>
+    param([string[]]$Folders, [string]$Dev)
+    $best = $null; $bestVer = $null
+    foreach ($folder in $Folders) {
+        $infPath = Join-Path $folder 'mtkwl6ex.inf'
+        if (-not (Test-Path $infPath)) { continue }
+        $text = [System.IO.File]::ReadAllText($infPath)
+        if ($text -notmatch "DEV_$Dev&SUBSYS_") { continue }
+        $ver = [version]'0.0'
+        if ($text -match '(?im)^\s*DriverVer\s*=\s*[^,\r\n]*,\s*(\d+(\.\d+){1,3})') { $ver = [version]$Matches[1] }
+        if ($null -eq $best -or $ver -gt $bestVer) { $best = $folder; $bestVer = $ver }
+    }
+    $best
+}
+
 function Get-MTCompetingDrivers {
     <#
         Published names (oemNN.inf) of every staged Windows 11 'mtkwecx' package.
@@ -270,10 +291,15 @@ function Invoke-MTInstall {
         # --- locate driver source: bundled folder, else in-box DriverStore ----
         $srcInf = Join-Path $DriverSource 'mtkwl6ex.inf'
         if (-not (Test-Path $srcInf)) {
-            $store = Get-ChildItem 'C:\Windows\System32\DriverStore\FileRepository' -Directory -ErrorAction SilentlyContinue |
-                     Where-Object { $_.Name -like 'mtkwl6ex.inf_amd64_*' } | Select-Object -First 1
-            if (-not $store) { Write-MTLog 'Bundled driver missing and no in-box mtkwl6ex in the DriverStore.' 'error'; return $false }
-            $DriverSource = $store.FullName
+            $candidates = @(Get-ChildItem (Join-Path $env:SystemRoot 'System32\DriverStore\FileRepository') -Directory -ErrorAction SilentlyContinue |
+                            Where-Object { $_.Name -like 'mtkwl6ex.inf_amd64_*' } | ForEach-Object { $_.FullName })
+            $store = Select-MTDriverPackage -Folders $candidates -Dev $devId
+            if (-not $store) {
+                Write-MTLog "No Windows 10 'mtkwl6ex' driver that supports the MT7925 was found ($($candidates.Count) mtkwl6ex package(s) in the DriverStore)." 'error'
+                Write-MTLog 'Install it via Settings > Windows Update > Optional updates > Driver updates, or pass a folder containing it (see README, "About the driver").' 'error'
+                return $false
+            }
+            $DriverSource = $store
             $srcInf = Join-Path $DriverSource 'mtkwl6ex.inf'
             Write-MTLog "Bundled driver missing; using in-box package: $DriverSource" 'warn'
         }
@@ -341,7 +367,12 @@ function Invoke-MTInstall {
 
         # --- install, rescan, verify -----------------------------------------
         Write-MTLog 'Installing patched driver package ...'
-        pnputil /add-driver $inf /install | Out-Null
+        $addOutput = pnputil /add-driver $inf /install
+        if ($LASTEXITCODE -ne 0) {
+            # Not always fatal (e.g. 3010 = reboot required), so report and let the check below decide.
+            Write-MTLog "pnputil /add-driver exit code $($LASTEXITCODE):" 'warn'
+            $addOutput | Where-Object { "$_".Trim() } | ForEach-Object { Write-MTLog "  $_" 'warn' }
+        }
         pnputil /scan-devices | Out-Null
         Start-Sleep -Seconds 5
 

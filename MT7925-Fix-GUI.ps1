@@ -175,15 +175,23 @@ function Start-Worker([string]$action) {
     Set-Busy $true
     $worker = {
         param($corePath, $action, $driverSource, $certSubject, $queue)
-        . $corePath
-        Set-MTLogSink { param($m, $l) $queue.Enqueue([pscustomobject]@{ Msg = $m; Lvl = $l }) }
-        $ok = switch ($action) {
-            'enable'  { Enable-MTTestSigning }
-            'disable' { Disable-MTTestSigning }
-            'install' { Invoke-MTInstall -DriverSource $driverSource -CertSubject $certSubject }
-            default   { $false }
+        $ok = $false
+        try {
+            . $corePath
+            Set-MTLogSink { param($m, $l) $queue.Enqueue([pscustomobject]@{ Msg = $m; Lvl = $l }) }
+            $ok = switch ($action) {
+                'enable'  { Enable-MTTestSigning }
+                'disable' { Disable-MTTestSigning }
+                'install' { Invoke-MTInstall -DriverSource $driverSource -CertSubject $certSubject }
+                default   { $false }
+            }
+        } catch {
+            $ok = $false
+            $queue.Enqueue([pscustomobject]@{ Msg = "Unexpected error: $($_.Exception.Message)"; Lvl = 'error' })
+        } finally {
+            # Always signal completion, or the window would stay busy forever.
+            $queue.Enqueue([pscustomobject]@{ Msg = '__DONE__'; Lvl = ([string][bool]$ok) })
         }
-        $queue.Enqueue([pscustomobject]@{ Msg = '__DONE__'; Lvl = ([string][bool]$ok) })
     }
     $script:rs = [runspacefactory]::CreateRunspace()
     $script:rs.ApartmentState = 'MTA'
