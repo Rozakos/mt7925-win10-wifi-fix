@@ -74,5 +74,22 @@ $again = Add-MTSubsysToInf -Lines $r.Lines -Dev '7925' -Subsys 'E0FF17AA'
 Assert-Equal 'idempotent' $true $again.AlreadyPresent
 Assert-Equal 'no anchor -> nothing added' 0 (Add-MTSubsysToInf -Lines @('[x]', 'foo') -Dev '7925' -Subsys 'E0FF17AA').Added
 
+# --- no two variables in one function may differ only by case (issue #1) ----
+# PowerShell variable names are case-insensitive, so '$DEV' and '$dev' are the
+# same variable and the second assignment silently overwrites the first.
+foreach ($file in 'engine\MT7925-Core.ps1', 'Fix-MT7925-WiFi.ps1', 'MT7925-Fix-GUI.ps1') {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $root $file), [ref]$null, [ref]$null)
+    $functions = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)
+    foreach ($fn in $functions) {
+        $clashes = $fn.FindAll({ param($n) $n -is [System.Management.Automation.Language.VariableExpressionAst] }, $true) |
+                   ForEach-Object { $_.VariablePath.UserPath } |
+                   Where-Object { $_ -notmatch '^(true|false|null|_|matches|lastexitcode)$' } |
+                   Group-Object |
+                   Where-Object { @($_.Group | Sort-Object -Unique -CaseSensitive).Count -gt 1 } |
+                   ForEach-Object { (@($_.Group | Sort-Object -Unique -CaseSensitive) | ForEach-Object { '$' + $_ }) -join ' vs ' }
+        Assert-Equal "$file $($fn.Name): variables differing only by case" '' (@($clashes) -join '; ')
+    }
+}
+
 Write-Host "$script:passed passed, $script:failed failed"
 if ($script:failed) { exit 1 }

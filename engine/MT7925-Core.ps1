@@ -256,10 +256,12 @@ function Invoke-MTInstall {
         [string]$CertSubject = 'CN=MTKDriverCert'
     )
     try {
-        $VEN = $script:MT_VEN; $DEV = $script:MT_DEV
+        # PowerShell variable names are case-insensitive: these must not be
+        # called $VEN/$DEV, or '$dev = Get-MTDevice' below overwrites the id.
+        $venId = $script:MT_VEN; $devId = $script:MT_DEV
 
         $dev = Get-MTDevice
-        if (-not $dev)         { Write-MTLog "No MT7925 (VEN_$VEN&DEV_$DEV) device present." 'error'; return $false }
+        if (-not $dev)         { Write-MTLog "No MT7925 (VEN_$venId&DEV_$devId) device present." 'error'; return $false }
         if (-not $dev.Subsys)  { Write-MTLog "Could not read this board's SUBSYS id." 'error'; return $false }
         $subsys = $dev.Subsys
         Write-MTLog "Device: $($dev.FriendlyName)"
@@ -286,12 +288,12 @@ function Invoke-MTInstall {
         Write-MTLog "Working copy: $work"
 
         # --- inject this board's subsystem into the INF (UTF-16 LE) -----------
-        $idLine = "PCI\VEN_$VEN&DEV_$DEV&SUBSYS_$subsys"
-        $patch = Add-MTSubsysToInf -Lines ([System.IO.File]::ReadAllLines($inf)) -Dev $DEV -Subsys $subsys
+        $idLine = "PCI\VEN_$venId&DEV_$devId&SUBSYS_$subsys"
+        $patch = Add-MTSubsysToInf -Lines ([System.IO.File]::ReadAllLines($inf)) -Dev $devId -Subsys $subsys
         if ($patch.AlreadyPresent) {
             Write-MTLog 'Subsystem already present in INF; no edit needed.' 'good'
         } elseif ($patch.Added -eq 0) {
-            Write-MTLog "Could not find a DEV_$DEV anchor line in the INF." 'error'; return $false
+            Write-MTLog "Could not find a DEV_$devId anchor line in the INF." 'error'; return $false
         } else {
             $enc = New-Object System.Text.UnicodeEncoding($false, $true)   # UTF-16 LE + BOM
             [System.IO.File]::WriteAllLines($inf, $patch.Lines, $enc)
