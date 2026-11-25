@@ -100,6 +100,9 @@ files). Either copy that package into a folder named **`driver`** next to the sc
 .\Fix-MT7925-WiFi.ps1 -DriverSource "C:\path\to\mtkwl6ex"
 ```
 
+**Good source:** Dell's [MediaTek MT7920/MT7921/MT7922/MT7925 Wi-Fi UWD Driver](https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=7ty65&lwp=rt),
+version 5.7.0.5115, A21 or newer.
+
 ## Troubleshooting
 
 | What you see | What it means / what to do |
