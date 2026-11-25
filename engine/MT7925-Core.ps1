@@ -125,9 +125,55 @@ function ConvertFrom-MTBcdTestSigning {
     $BcdText -match "(?im)^\s*testsigning\s+($script:MTBcdYes)\s*$"
 }
 
+function Get-MTBcdTarget {
+    <#
+        Which BCD store/entry bcdedit should use. Normally the system store and
+        {current}. But when Windows was started by a foreign loader (e.g. GRUB
+        chainloading bootmgr on legacy BIOS) the BCD hive is not mounted and plain
+        bcdedit fails with "The boot configuration data store could not be opened".
+        Then address the store file on the system partition directly; {current}
+        does not exist in an offline store, so use {default}.
+        Returns @{ Store = <extra args>; Id = <entry> ; Path = <file or $null> } or $null.
+    #>
+    $ErrorActionPreference = 'Continue'
+    & bcdedit.exe /enum '{current}' 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) { return @{ Store = @(); Id = '{current}'; Path = $null } }
+    $sys = Get-Partition -ErrorAction SilentlyContinue | Where-Object { $_.IsSystem -or $_.IsActive } |
+           Where-Object { $_.DriveLetter } | Select-Object -First 1
+    foreach ($p in @(
+            $(if ($sys) { "$($sys.DriveLetter):\Boot\BCD" }),
+            "$env:SystemDrive\Boot\BCD") | Where-Object { $_ }) {
+        if (Test-Path $p) { return @{ Store = @('/store', $p); Id = '{default}'; Path = $p } }
+    }
+    $null
+}
+
 function Test-MTTestSigning {
     # Configured for the NEXT boot (what bcdedit says).
-    ConvertFrom-MTBcdTestSigning ((bcdedit /enum '{current}') -join "`n")
+    $t = Get-MTBcdTarget
+    if (-not $t) { return $false }
+    $ErrorActionPreference = 'Continue'
+    ConvertFrom-MTBcdTestSigning ((& bcdedit.exe @($t.Store) /enum $t.Id 2>&1 | ForEach-Object { "$_" }) -join "`n")
+}
+
+function Set-MTTestSigning {
+    <# Runs bcdedit /set testsigning on|off against the right store; logs bcdedit's text on failure. #>
+    param([ValidateSet('on','off')][string]$Value)
+    $t = Get-MTBcdTarget
+    if (-not $t) {
+        Write-MTLog 'Could not open the boot configuration (BCD) store, and no \Boot\BCD file was found on the system partition.' 'error'
+        return $false
+    }
+    if ($t.Path) { Write-MTLog "System BCD store is not mounted (foreign boot loader?); using $($t.Path) entry $($t.Id)." 'warn' }
+    $ErrorActionPreference = 'Continue'
+    $out = & bcdedit.exe @($t.Store) /set $t.Id testsigning $Value 2>&1 | ForEach-Object { "$_" }
+    $code = $LASTEXITCODE
+    if ($code -ne 0) {
+        Write-MTLog "bcdedit failed (exit code $code):" 'error'
+        $out | Where-Object { $_.Trim() } | ForEach-Object { Write-MTLog "  $_" 'error' }
+        return $false
+    }
+    $true
 }
 
 function Test-MTTestSigningActive {
@@ -261,8 +307,10 @@ function Get-MTCompetingDrivers {
 # ---------------------------------------------------------------------------
 function Enable-MTTestSigning {
     Write-MTLog '=== Enabling test signing ===' 'step'
-    bcdedit /set testsigning on | Out-Null
-    if ($LASTEXITCODE -ne 0) { Write-MTLog 'Failed to enable test signing (is Secure Boot still on?).' 'error'; return $false }
+    if (-not (Set-MTTestSigning -Value on)) {
+        Write-MTLog 'Failed to enable test signing. Common causes: Secure Boot still ON in firmware; Memory Integrity / Core Isolation (HVCI) or Credential Guard enabled; not running elevated.' 'warn'
+        return $false
+    }
     Write-MTLog 'Test signing enabled. REBOOT, then run the fix again to finish.' 'good'
     Write-MTLog "(A 'Test Mode' watermark after reboot is expected and harmless.)" 'info'
     $true
@@ -270,8 +318,7 @@ function Enable-MTTestSigning {
 
 function Disable-MTTestSigning {
     Write-MTLog '=== Disabling test signing (hardening) ===' 'step'
-    bcdedit /set testsigning off | Out-Null
-    if ($LASTEXITCODE -ne 0) { Write-MTLog 'Failed to disable test signing.' 'error'; return $false }
+    if (-not (Set-MTTestSigning -Value off)) { Write-MTLog 'Failed to disable test signing.' 'error'; return $false }
     Write-MTLog 'Test signing disabled. REBOOT; the driver keeps working on its embedded' 'good'
     Write-MTLog 'Microsoft signature. After reboot you can re-enable Secure Boot in BIOS.' 'good'
     $true

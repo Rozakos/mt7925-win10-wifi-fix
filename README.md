@@ -108,6 +108,7 @@ files). Either copy that package into a folder named **`driver`** next to the sc
 | *"Could not find a DEV_ anchor line in the INF"* | The driver folder you supplied (`driver` folder or `-DriverSource`) doesn't list the MT7925. Use a newer `mtkwl6ex` package. |
 | *"No Windows 10 'mtkwl6ex' driver that supports the MT7925 was found"* | Get the driver first: see *About the driver*. |
 | *"pnputil /add-driver exit code ..."* in the log | Windows refused or deferred the package; the lines under it are `pnputil`'s own explanation. Check that test signing is active (the tool shows it) and that you rebooted after enabling it. |
+| *"The boot configuration data store could not be opened"* | Legacy BIOS/MBR setup where Windows' system partition isn't where `\Boot\BCD` lives (e.g. a third-party boot manager or Windows on a second disk), so Windows did not mount its BCD store. The tool falls back to `\Boot\BCD` on the system partition automatically. Manual (PowerShell needs the quotes around `{default}`): `bcdedit /store F:\Boot\BCD /set '{default}' testsigning on` (F: = "System Reserved"). |
 | *"Driver installed but device is not OK"* | Open Device Manager for the adapter's error code, and Event Viewer → System. Please include both in a compatibility report. |
 | Wi-Fi works, then drops after a while | Not a known script problem. Try unchecking *Allow the computer to turn off this device to save power* (adapter → Power Management) and open an issue with your hardware ID and any Event Viewer errors. |
 
